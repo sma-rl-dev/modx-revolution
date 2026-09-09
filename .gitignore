@@ -29,6 +29,7 @@ nbproject/
 # ignore php and txt files beginning with test in root directory
 /test*.php
 /test*.txt
+!tester-env-seed.php
 
 # ignore mac files
 .DS_Store
@@ -52,7 +53,6 @@ _build/templates/default/sass/font-awesome
 # ignore composer files
 composer.phar
 #composer.json
-composer.lock
 
 # ignore composer vendor dir
 /vendor

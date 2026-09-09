@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: ./tester-env <deploy|reset|seed|verify|stop|status|logs|help> [--run-id ID] [--port PORT]
+Environment: IMAGE_TAG (default tester-env-modx-revolution:dev), RUN_ID, PORT (default 8096).
+Credentials: tester-admin / modx-17082005 at /manager/.
+EOF
+}
+
+run_id="${RUN_ID:-}"
+port="${PORT:-8096}"
+command="${1:-help}"
+shift || true
+while (($#)); do
+  case "$1" in
+    --run-id) run_id="$2"; shift 2 ;;
+    --port) port="$2"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+case "$run_id" in '') suffix='' ;; *) suffix="-$run_id" ;; esac
+export RUN_SUFFIX="$suffix" PORT="$port" COMPOSE_PROJECT_NAME="tester-env-modx-revolution${suffix}"
+compose=(docker compose -f "$(dirname "$0")/docker-compose.tester-env.yml")
+
+install_modx() {
+  "${compose[@]}" exec -T --user www-data app php _build/transport.core.php
+  "${compose[@]}" exec -T --user www-data app php setup/cli-install.php \
+    --database_server=mysql --database=modx --database_user=modx --database_password=modx \
+    --cmsadmin=tester-admin --cmspassword=modx-17082005 --cmsadminemail=admin@example.test \
+    --http_host=localhost --table_prefix=modx_ --language=en --inplace=1 --unpacked=0 --remove_setup_directory=0
+  "${compose[@]}" exec -T app php -r 'require "core/config/config.inc.php"; exit(isset($database_dsn) ? 0 : 1);'
+}
+
+case "$command" in
+  deploy)
+    echo '==> Building MODX from source and starting services'
+    "${compose[@]}" up --build -d
+    "${compose[@]}" exec -T app sh -lc 'until php -r "new PDO(\"mysql:host=mysql;dbname=modx\", \"modx\", \"modx\");"; do sleep 1; done'
+    if ! "${compose[@]}" exec -T app test -f core/config/config.inc.php; then
+      echo '==> Building MODX core package and installing MODX'
+      install_modx
+    fi
+    echo "==> Ready: http://localhost:$port/"
+    ;;
+  reset)
+    echo '==> Removing MODX app services and database volume'
+    "${compose[@]}" down -v --remove-orphans
+    ;;
+  seed)
+    echo '==> Seeding deterministic MODX resources'
+    "${compose[@]}" exec -T --user www-data app php tester-env-seed.php
+    ;;
+  verify)
+    echo '==> Checking MODX site, manager, and seeded resources'
+    curl --fail --silent --show-error "http://localhost:$port/" >/dev/null
+    manager_page="$(curl --fail --silent --show-error "http://localhost:$port/manager/")"
+    [[ "$manager_page" == *MODX* ]]
+    "${compose[@]}" exec -T --user www-data app php -r '
+      define("MODX_API_MODE", true); require "index.php"; $modx->initialize("mgr");
+      $rows = $modx->getCollection("MODX\\Revolution\\modResource", ["alias:IN" => ["operations-hub", "harbor-safety-briefing", "autumn-berth-schedule"], "context_key" => "web"]);
+      $actual = array_map(fn($row) => $row->get("pagetitle"), $rows); sort($actual);
+      if ($actual !== ["Autumn Berth Schedule", "Harbor Safety Briefing", "Operations Hub"]) exit(1);
+    '
+    ;;
+  stop)
+    echo '==> Stopping MODX services (preserving database volume)'
+    "${compose[@]}" stop
+    ;;
+  status)
+    "${compose[@]}" ps
+    echo "==> URL: http://localhost:$port/"
+    ;;
+  logs) "${compose[@]}" logs --tail=200 ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac
