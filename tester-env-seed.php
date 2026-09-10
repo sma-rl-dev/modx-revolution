@@ -28,4 +28,30 @@ foreach ($records as $record) {
     $ids[$record['alias']] = (int) $resource->get('id');
 }
 $modx->cacheManager->refresh();
+
+// Deterministic media-browser sort fixtures: the default media source
+// (empty basePath, basePathRelative) resolves to the web root, so these
+// live under assets/sort-fixtures/. Fixed content plus fixed mtimes keep
+// re-seeds identical; newest-first order (zulu, harbor, alpha) differs
+// from alphabetical name order (alpha, harbor, zulu).
+$fixtureDir = (defined('MODX_BASE_PATH') ? MODX_BASE_PATH : __DIR__ . '/') . 'assets/sort-fixtures/';
+$fixtures = [
+    ['name' => 'alpha-dock-manifest.txt', 'mtime' => gmmktime(10, 0, 0, 1, 10, 2024), 'content' => "Alpha dock manifest fixture.\n"],
+    ['name' => 'harbor-tide-log.txt', 'mtime' => gmmktime(10, 0, 0, 6, 15, 2024), 'content' => "Harbor tide log fixture.\n"],
+    ['name' => 'zulu-berth-report.txt', 'mtime' => gmmktime(10, 0, 0, 11, 20, 2024), 'content' => "Zulu berth report fixture.\n"],
+];
+if (!is_dir($fixtureDir) && !mkdir($fixtureDir, 0755, true)) {
+    throw new RuntimeException('Could not create ' . $fixtureDir);
+}
+foreach ($fixtures as $fixture) {
+    $path = $fixtureDir . $fixture['name'];
+    if (file_put_contents($path, $fixture['content']) === false) {
+        throw new RuntimeException('Could not write ' . $path);
+    }
+    if (!touch($path, $fixture['mtime'])) {
+        throw new RuntimeException('Could not set mtime on ' . $path);
+    }
+    clearstatcache(true, $path);
+}
 echo "Seeded Operations Hub, Harbor Safety Briefing, Autumn Berth Schedule\n";
+echo "Seeded media sort fixtures in assets/sort-fixtures/ (alpha oldest, zulu newest)\n";

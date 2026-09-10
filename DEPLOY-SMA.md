@@ -22,8 +22,11 @@ Manager credentials: `tester-admin` / `modx-17082005` at `/manager/`.
 ## Seed and verification
 
 The deterministic seed creates the published `Operations Hub` container with
-`Harbor Safety Briefing` and `Autumn Berth Schedule`. `verify` checks the site,
-manager response, and exactly those resource titles through MODX's API.
+`Harbor Safety Briefing` and `Autumn Berth Schedule`, plus three media sort
+fixtures under `assets/sort-fixtures/` (`alpha-dock-manifest.txt` oldest,
+`zulu-berth-report.txt` newest, fixed 2024 mtimes). `verify` checks the site,
+manager response, exactly those resource titles through MODX's API, and the
+three fixture files with exact mtimes.
 
 ## Browser smoke evidence
 

@@ -62,6 +62,12 @@ case "$command" in
       $rows = $modx->getCollection("MODX\\Revolution\\modResource", ["alias:IN" => ["operations-hub", "harbor-safety-briefing", "autumn-berth-schedule"], "context_key" => "web"]);
       $actual = array_map(fn($row) => $row->get("pagetitle"), $rows); sort($actual);
       if ($actual !== ["Autumn Berth Schedule", "Harbor Safety Briefing", "Operations Hub"]) exit(1);
+      $dir = (defined("MODX_BASE_PATH") ? MODX_BASE_PATH : "/var/www/html/") . "assets/sort-fixtures/";
+      $expected = ["alpha-dock-manifest.txt" => gmmktime(10, 0, 0, 1, 10, 2024), "harbor-tide-log.txt" => gmmktime(10, 0, 0, 6, 15, 2024), "zulu-berth-report.txt" => gmmktime(10, 0, 0, 11, 20, 2024)];
+      foreach ($expected as $name => $mtime) {
+        $path = $dir . $name;
+        if (!is_file($path) || filemtime($path) !== $mtime) exit(1);
+      }
     '
     ;;
   stop)
