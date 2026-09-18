@@ -68,6 +68,35 @@ case "$command" in
         $path = $dir . $name;
         if (!is_file($path) || filemtime($path) !== $mtime) exit(1);
       }
+      $templateId = (int) $modx->getOption("default_template", null, 1);
+      $notes = $modx->getObject("MODX\\Revolution\\modTemplateVar", ["name" => "berthNotes"]);
+      if (!$notes || $notes->get("type") !== "textarea" || $notes->get("caption") !== "Berth Notes") exit(1);
+      $noteProps = $notes->get("input_properties") ?: [];
+      if (!array_key_exists("textareaGrow", $noteProps) || !empty($noteProps["textareaGrow"])) exit(1);
+      if (($noteProps["textareaResizable"] ?? null) != true) exit(1);
+      $imageTv = $modx->getObject("MODX\\Revolution\\modTemplateVar", ["name" => "berthImage"]);
+      $dateTv = $modx->getObject("MODX\\Revolution\\modTemplateVar", ["name" => "berthInspectionDate"]);
+      if (!$imageTv || $imageTv->get("type") !== "image") exit(1);
+      if (!$dateTv || $dateTv->get("type") !== "date") exit(1);
+      if (!empty($dateTv->get("input_properties"))) exit(1);
+      foreach (["berthNotes", "berthImage", "berthInspectionDate"] as $tvName) {
+        $tv = $modx->getObject("MODX\\Revolution\\modTemplateVar", ["name" => $tvName]);
+        if (!$modx->getObject("MODX\\Revolution\\modTemplateVarTemplate", ["tmplvarid" => $tv->get("id"), "templateid" => $templateId])) exit(1);
+      }
+      $harborPath = (defined("MODX_BASE_PATH") ? MODX_BASE_PATH : "/var/www/html/") . "assets/tv-fixtures/harbor&crane.jpg";
+      if (!is_file($harborPath) || md5_file($harborPath) !== "7806ba0f8cb19129bd9e7bdad51b2b25" || filemtime($harborPath) !== gmmktime(10, 0, 0, 9, 2, 2024)) exit(1);
+      $schedule = $modx->getObject("MODX\\Revolution\\modResource", ["alias" => "autumn-berth-schedule", "context_key" => "web"]);
+      if (!$schedule) exit(1);
+      $imageVal = $modx->getObject("MODX\\Revolution\\modTemplateVarResource", ["tmplvarid" => $imageTv->get("id"), "contentid" => $schedule->get("id")]);
+      $dateVal = $modx->getObject("MODX\\Revolution\\modTemplateVarResource", ["tmplvarid" => $dateTv->get("id"), "contentid" => $schedule->get("id")]);
+      if (!$imageVal || $imageVal->get("value") !== "assets/tv-fixtures/harbor&crane.jpg") exit(1);
+      if (!$dateVal || $dateVal->get("value") !== "2024-09-15 10:00:00") exit(1);
+      $observer = $modx->getObject("MODX\\Revolution\\modUser", ["username" => "dock-observer"]);
+      $admin = $modx->getObject("MODX\\Revolution\\modUser", ["username" => "tester-admin"]);
+      if (!$observer || !$observer->get("active") || !$admin) exit(1);
+      if (!$observer->passwordMatches("dock-observer-17082005")) exit(1);
+      $msg = $modx->getObject("MODX\\Revolution\\modUserMessage", ["sender" => $observer->get("id"), "recipient" => $admin->get("id"), "subject" => "Dockside shift handover"]);
+      if (!$msg || $msg->get("date_sent") !== "2024-09-02 09:00:00") exit(1);
     '
     ;;
   stop)
