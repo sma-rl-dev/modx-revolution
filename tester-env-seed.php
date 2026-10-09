@@ -102,7 +102,7 @@ $tvs = [
         'caption' => 'Berth Inspection Date',
         'description' => 'Deterministic date TV fixture with empty input properties.',
         'type' => 'date',
-        'input_properties' => [],
+        'input_properties' => null,
     ],
 ];
 $tvIds = [];
@@ -181,8 +181,16 @@ $observer->set('active', true);
 if (!$observer->save()) {
     throw new RuntimeException('Could not save user dock-observer');
 }
-$observerProfile = $modx->getObject(modUserProfile::class, ['internalKey' => (int) $observer->get('id')])
-    ?: $modx->newObject(modUserProfile::class);
+$observerProfile = $modx->getObject(modUserProfile::class, ['internalKey' => (int) $observer->get('id')]);
+if (!$observerProfile) {
+    $observerProfile = $modx->newObject(modUserProfile::class);
+    // Deterministic profile/user ID-divergence prerequisite (scenario-local):
+    // a fresh dock-observer profile takes a PK outside the user-ID domain
+    // while its internalKey still equals the observer user ID, so baseline
+    // internalKey joins succeed and the mutant id joins miss. An existing
+    // profile is left untouched, keeping reseeds canonical.
+    $observerProfile->set('id', 9000 + (int) $observer->get('id'));
+}
 $observerProfile->fromArray([
     'internalKey' => (int) $observer->get('id'),
     'email' => 'dock-observer@example.test', 'fullname' => 'Dock Observer', 'blocked' => false,
